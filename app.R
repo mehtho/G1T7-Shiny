@@ -102,7 +102,7 @@ plot_acc <- function(method, quantiles, grid_size, point_type, exponent, subz, u
 ui <- fluidPage(
 
     # Application title
-    titlePanel("Accessibility of ..."),
+    titlePanel("Accessibility Modelling in Singapore"),
 
     # Sidebar with a slider input for number of bins 
     sidebarLayout(
