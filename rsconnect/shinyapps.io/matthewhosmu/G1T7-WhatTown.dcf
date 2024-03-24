@@ -1,0 +1,12 @@
+name: G1T7-WhatTown
+title: G1T7-WhatTown
+username: matthewhosmu
+account: matthewhosmu
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 11574503
+bundleId: 8410980
+url: https://matthewhosmu.shinyapps.io/G1T7-WhatTown/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
