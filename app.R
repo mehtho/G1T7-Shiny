@@ -2,8 +2,18 @@ pacman::p_load(shiny, tidyverse, tmap, sf, smoothr, SpatialAcc, hash, cowplot)
 
 name2file <- new.env(hash=T, parent=emptyenv())
 
-name2file[["Markets & Food Centres"]] <- "markets_and_food_centres.rds"
+name2file[["Markets or Food Centres"]] <- "markets_and_food_centres.rds"
+
+name2file[["Markets"]] <- "markets_and_food_centres_MARKET.rds"
+name2file[["Hawker Centres"]] <- "markets_and_food_centres_HAWKER_CENTRE.rds"
+name2file[["Markets and Food Centres"]] <- "markets_and_food_centres_MARKET_AND_HAKWER.rds"
+
 name2file[["Supermarkets"]] <- "supermarkets.rds"
+
+name2file[["Supermarkets: Fairprice"]] <- "supermarkets_FAIRPRICE.rds"
+name2file[["Supermarkets: Sheng Siong"]] <- "supermarkets_SHENG SIONG.rds"
+name2file[["Supermarkets: Cold Storage"]] <- "supermarkets_COLD STORAGE.rds"
+name2file[["Supermarkets: Others"]] <- "supermarkets_OTHER.rds"
 
 name2file[["MRT Stations"]] <- "mrt.rds"
 name2file[["ATMs"]] <- "poi_atm.rds"
@@ -25,7 +35,9 @@ name2file[["Tourist Attractions"]] <- "poi_tourist_attraction.rds"
 
 name2file[["Bus Stops"]] <- "osm_sg.rds"
 
-location_options <- c(c("Markets & Food Centres", "Supermarkets"), sort(c("MRT Stations", "ATMs", "Banks", "Beauty Salons", "Cafes", "Clothing Stores", 
+location_options <- c(c("Markets or Food Centres", "Hawker Centres", "Markets and Food Centres"), 
+                      c("Supermarkets", "Supermarkets: Fairprice", "Supermarkets: Sheng Siong", "Supermarkets: Cold Storage", "Supermarkets: Others"),
+                      sort(c("MRT Stations", "ATMs", "Banks", "Beauty Salons", "Cafes", "Clothing Stores", 
                                                                           "Convenience Stores", "Dentists", "Doctors", "Gyms",
                                                                             "Libraries", "Lodging", "Places of Worship", "Restaurants",
                                                                           "Schools", "Tourist Attractions", "Bus Stops")))
@@ -117,9 +129,9 @@ ui <- fluidPage(
                       selected = "250"),
           selectInput("poiType", label = "Place of Interest:",
                       choices = location_options,
-                      selected = "supermarkets"),
+                      selected = "Markets"),
           sliderInput("exponent", label = "Distance Exponent:",
-                      min = 1.5, max = 3, value = 2, step = 0.25),
+                      min = 1, max = 3, value = 2, step = 0.25),
           radioButtons("granularity", label = "Subzone or Planning Area Population:",
                        choices = c("Subzone", "Planning Area"),
                        selected = "Subzone"),
