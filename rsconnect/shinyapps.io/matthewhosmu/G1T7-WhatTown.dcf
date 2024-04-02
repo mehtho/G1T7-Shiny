@@ -5,7 +5,7 @@ account: matthewhosmu
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 11574503
-bundleId:
+bundleId: 8444402
 url: https://matthewhosmu.shinyapps.io/G1T7-WhatTown/
 version: 1
 asMultiple: FALSE

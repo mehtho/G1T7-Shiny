@@ -44,8 +44,14 @@ location_options <- c(c("Markets or Food Centres", "Hawker Centres", "Markets an
 
 tmap_color_palettes <- c("inferno", "magma", "plasma", "viridis", "YlGn", "YlGnBu", "GnBu", "BuGn", "PuBuGn", "PuBu", "BuPu", "RdPu", "PuRd", "YlOrRd")
                       
+scales <- c("fixed", "sd", "equal", "pretty", "quantile", "kmeans", "hclust", "bclust", "fisher", "jenks", "dpih", "headtails", "log10_pretty")
 
-plot_acc <- function(method, quantiles, grid_size, point_type, exponent, subz, useHex, colorPal) {
+evenly_separated <- function(A, B) {
+  seq <- seq(0, A, length.out = B)
+  return(seq)
+}
+
+plot_acc <- function(method, quantiles, grid_size, point_type, exponent, subz, useHex, colorPal, scale) {
   if(useHex) {
     grid <- read_rds(paste('data/rds/grid_', grid_size, '_hexagon', ifelse(subz, '_sz', '_pa'),'.rds', sep=""))
   }
@@ -80,7 +86,8 @@ plot_acc <- function(method, quantiles, grid_size, point_type, exponent, subz, u
              bbox = mapex) + 
     tm_fill(col = "acc",
             n = quantiles,
-            style = "quantile",
+            style = scale,
+            breaks = evenly_separated(max(hexagon$acc), quantiles),
             border.col = "black",
             border.lwd = 1,
             na.rm = TRUE,
@@ -127,7 +134,7 @@ ui <- fluidPage(
           selectInput("family", label = "Accessibility Modelling Family:",
                       choices = c("Hansen", "KD2SFCA", "SAM"),
                       selected = "250"),
-          sliderInput("quantiles", label = "Quantiles:",
+          sliderInput("quantiles", label = "Breaks:",
                       min = 4, max = 10, value = 6),
           selectInput("gridSize", label = "Grid Size:",
                       choices = c("250", "500", "1000"),
@@ -145,7 +152,10 @@ ui <- fluidPage(
                        selected = "Hexagon"),
           selectInput("colorPal", label="Colour Palette",
                       choices=tmap_color_palettes,
-                      selected="viridis")
+                      selected="viridis"),
+          selectInput("scale", label="Scaling:",
+                      choices = scales,
+                      selected="quantile")
         ),
 
         # Show a plot of the generated distribution
@@ -165,7 +175,8 @@ server <- function(input, output) {
                input$exponent, 
                input$granularity == "Subzone", 
                input$gridShape == "Hexagon",
-               input$colorPal)
+               input$colorPal,
+               input$scale)
     })
 }
 
