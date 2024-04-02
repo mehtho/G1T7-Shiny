@@ -42,7 +42,10 @@ location_options <- c(c("Markets or Food Centres", "Hawker Centres", "Markets an
                                                                             "Libraries", "Lodging", "Places of Worship", "Restaurants",
                                                                           "Schools", "Tourist Attractions", "Bus Stops")))
 
-plot_acc <- function(method, quantiles, grid_size, point_type, exponent, subz, useHex) {
+tmap_color_palettes <- c("inferno", "magma", "plasma", "viridis", "YlGn", "YlGnBu", "GnBu", "BuGn", "PuBuGn", "PuBu", "BuPu", "RdPu", "PuRd", "YlOrRd")
+                      
+
+plot_acc <- function(method, quantiles, grid_size, point_type, exponent, subz, useHex, colorPal) {
   if(useHex) {
     grid <- read_rds(paste('data/rds/grid_', grid_size, '_hexagon', ifelse(subz, '_sz', '_pa'),'.rds', sep=""))
   }
@@ -80,7 +83,8 @@ plot_acc <- function(method, quantiles, grid_size, point_type, exponent, subz, u
             style = "quantile",
             border.col = "black",
             border.lwd = 1,
-            na.rm = TRUE) +
+            na.rm = TRUE,
+            palette=colorPal) +
     tm_shape(points) +
     tm_symbols(size = 0.1) +
     tm_layout(main.title = paste("Accessibility to ", point_type, ": ", method," method", sep=""),
@@ -102,6 +106,7 @@ plot_acc <- function(method, quantiles, grid_size, point_type, exponent, subz, u
                        aes(y = acc, 
                            x = REGION_N)) +
     geom_boxplot(outliers = FALSE) +
+    labs(x = "REGION", y = "ACCESSIBILITY") + 
     geom_point(stat="summary", 
                fun.y="mean", 
                colour ="red", 
@@ -137,7 +142,10 @@ ui <- fluidPage(
                        selected = "Subzone"),
           radioButtons("gridShape", label = "Grid Shape:",
                        choices = c("Hexagon", "Square"),
-                       selected = "Hexagon")
+                       selected = "Hexagon"),
+          selectInput("colorPal", label="Colour Palette",
+                      choices=tmap_color_palettes,
+                      selected="viridis")
         ),
 
         # Show a plot of the generated distribution
@@ -150,7 +158,14 @@ ui <- fluidPage(
 # Define server logic required to draw a histogram
 server <- function(input, output) {
     output$accPlot <- renderPlot({
-      plot_acc(input$family, input$quantiles, input$gridSize, input$poiType, input$exponent, input$granularity == "Subzone", input$gridShape == "Hexagon")
+      plot_acc(input$family, 
+               input$quantiles, 
+               input$gridSize, 
+               input$poiType, 
+               input$exponent, 
+               input$granularity == "Subzone", 
+               input$gridShape == "Hexagon",
+               input$colorPal)
     })
 }
 
