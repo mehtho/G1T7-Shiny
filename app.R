@@ -1,4 +1,4 @@
-pacman::p_load(shiny, tidyverse, tmap, sf, smoothr, SpatialAcc, hash, cowplot)
+pacman::p_load(shiny, tidyverse, tmap, sf, smoothr, SpatialAcc, hash, cowplot, maptools, spatstat, raster, tidyr)
 
 name2file <- new.env(hash=T, parent=emptyenv())
 
@@ -120,6 +120,111 @@ plot_acc <- function(method, quantiles, grid_size, point_type, exponent, subz, u
                size=2)
   
   plot_grid(tmap_grob(tm), region_bxp, nrow = 2, rel_heights = c(2, 1))
+}
+
+plot_kde <- function(bandwidth, bandwidthNum, kernel, point_type) {
+  merged <- read_rds("data/rds/merged.rds")
+  place <- read_rds(paste('data/rds/', name2file[[point_type]], sep="")) %>%
+    mutate(capacity = 500)
+  place_sp <- as_Spatial(place)
+  place_sp <- as(place_sp, "SpatialPoints")
+  place_ppp <- as(place_sp, "ppp")
+  place_ppp_jit <- rjitter(place_ppp,
+                           retry=TRUE,
+                           nsim=1,
+                           drop=TRUE)
+  merged_owin <- read_rds("data/rds/merged_owin.rds")
+  placeSG_ppp = place_ppp[merged_owin]
+  placeSG_ppp.km <- rescale(placeSG_ppp, 1000, "km")
+  if (bandwidth == "fixed") {
+    KDE <- density(placeSG_ppp.km, 
+                   sigma=bandwidthNum, 
+                   edge=TRUE, 
+                   kernel=kernel)
+  } else if (bandwidth == "adaptive") {
+    KDE <- adaptive.density(placeSG_ppp.km, 
+                            method="kernel")
+  } else if (bandwidth == "diggle") {
+    KDE <- density(placeSG_ppp.km, 
+                   sigma=bw.diggle, 
+                   edge=TRUE, 
+                   kernel=kernel)
+  } else if (bandwidth == "cvl") {
+    KDE <- density(placeSG_ppp.km, 
+                   sigma=bw.CvL, 
+                   edge=TRUE, 
+                   kernel=kernel)
+  } else if (bandwidth == "scott") {
+    KDE <- density(placeSG_ppp.km, 
+                   sigma=bw.scott, 
+                   edge=TRUE, 
+                   kernel=kernel)
+  } else {
+    KDE <- density(placeSG_ppp.km, 
+                   sigma=bw.ppl, 
+                   edge=TRUE, 
+                   kernel=kernel)
+  }
+  gridded <- as.SpatialGridDataFrame.im(KDE)
+  KDEraster <- raster(gridded)
+  projection(KDEraster) <- CRS("+init=EPSG:3414 +units=km")
+  tmap_mode("view")
+  tm_basemap(server="OpenStreetMap.HOT") +
+    tm_basemap(server = "Esri.WorldImagery") +
+    tm_shape(KDEraster) +
+    tm_raster("v",
+              title = "Kernel Density",
+              style = "pretty",
+              alpha = 0.6,
+              palette = c("#fafac3","#fd953b","#f02a75","#b62385","#021c9e")) +
+    tm_shape(merged)+
+    tm_polygons(alpha=0.1,
+                id="PLN_AREA_N", 
+                popup.vars=c(
+                  "Subzone",
+                  "Region",
+                  "Total Population",
+                  "9 and under",
+                  "10-19",
+                  "20-29",
+                  "30-39",
+                  "40-49",
+                  "50-59",
+                  "60-69",
+                  "70 and above"
+                ))+
+    tmap_options(check.and.fix = TRUE)
+}
+
+plot_sppa <- function(subzone, whichFunction, point_type, nsim) {
+  mpsz_sp <- read_rds("data/rds/mpsz_sp.rds")
+  sz = mpsz_sp[mpsz_sp@data$SUBZONE_N == toupper(subzone),]
+  sz_sp = as(sz, "SpatialPolygons")
+  sz_owin = as(sz_sp, "owin")
+  place <- read_rds(paste('data/rds/', name2file[[point_type]], sep="")) %>%
+    mutate(capacity = 500)
+  place_sp <- as_Spatial(place)
+  place_sp <- as(place_sp, "SpatialPoints")
+  place_ppp <- as(place_sp, "ppp")
+  place_ppp_jit <- rjitter(place_ppp,
+                           retry=TRUE,
+                           nsim=1,
+                           drop=TRUE)
+  sz_ppp = place_ppp_jit[sz_owin]
+  
+  if (tolower(whichFunction) == "g") {
+    plot(envelope(sz_ppp, Gest, correction="all", nsim=nsim))
+  } else if (tolower(whichFunction) == "f") {
+    plot(envelope(sz_ppp, Fest, correction="all", nsim=nsim))
+  } else if (tolower(whichFunction) == "k") {
+    K.csr <- envelope(sz_ppp, Kest, nsim=nsim, rank=1, glocal=TRUE)
+    plot(K.csr, . - r ~ r, 
+         xlab="d", ylab="K(d)-r", xlim=c(0,500))
+  } else {
+    L.csr <- envelope(sz_ppp, Lest, nsim=nsim, rank=1, glocal=TRUE)
+    plot(L.csr, . - r ~ r, 
+         xlab="d", ylab="L(d)-r", xlim=c(0,500))
+  }
 }
 
 # Define UI for application that draws a histogram
