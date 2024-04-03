@@ -1,4 +1,4 @@
-pacman::p_load(shiny, maptools, spatstat, raster, tidyverse, tmap, sf, smoothr, SpatialAcc, hash, cowplot)
+pacman::p_load(shiny, spatstat, raster, tidyverse, tmap, sf, smoothr, SpatialAcc, hash, cowplot)
 
 name2file <- new.env(hash=T, parent=emptyenv())
 
