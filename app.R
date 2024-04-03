@@ -190,6 +190,7 @@ ui <- fluidPage(
           selectInput("scale", label="Scaling:",
                       choices = scales,
                       selected="quantile"),
+          numericInput("cap_m", "Capacity Multiplier:", value = 1, min = 1, max = 100),
           actionButton("generate_button", "Generate Plots"),
         ),
 
@@ -204,7 +205,7 @@ ui <- fluidPage(
 server <- function(input, output) {
   trigger <- reactiveVal(FALSE)
   
-  plot_acc <- function(method, quantiles, grid_size, point_type, exponent, subz, useHex, colorPal, scale) {
+  plot_acc <- function(method, quantiles, grid_size, point_type, exponent, subz, useHex, colorPal, scale, cap_mult) {
     req(trigger())
     
     if(useHex) {
@@ -214,11 +215,12 @@ server <- function(input, output) {
       grid <- read_rds(paste('data/rds/grid_', grid_size, '_square', ifelse(subz, '_sz', '_pa'),'.rds', sep=""))
     }
     
-    points <- read_rds(paste('data/rds/', name2file[[point_type]], sep="")) %>%
-      mutate(capacity = 500)
+    points <- read_rds(paste('data/rds/', name2file[[point_type]], sep=""))
     
     centroid.coords <- st_coordinates(st_centroid(grid))
     points.coords <- st_coordinates(points)
+    
+    points$capacity <- points$capacity * cap_mult
     
     dm <- exp(distance(centroid.coords, points.coords, type = "euclidean") / 1000 * exponent)
     
@@ -287,7 +289,8 @@ server <- function(input, output) {
              input$granularity == "Subzone", 
              input$gridShape == "Hexagon",
              input$colorPal,
-             input$scale)$accP
+             input$scale,
+             input$cap_m)$accP
   })
   
   output$accBarPlot <- renderPlot({
@@ -299,7 +302,8 @@ server <- function(input, output) {
              input$granularity == "Subzone", 
              input$gridShape == "Hexagon",
              input$colorPal,
-             input$scale)$accBP
+             input$scale,
+             input$cap_m)$accBP
   })
   observeEvent(input$generate_button, {
     trigger(TRUE)
