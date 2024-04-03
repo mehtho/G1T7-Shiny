@@ -195,8 +195,8 @@ ui <- fluidPage(
 
         # Show a plot of the generated distribution
         mainPanel(
-          plotOutput("accPlot"),
-          plotOutput("accBarPlot")
+          plotOutput("accPlot", height="700"),
+          plotOutput("accBarPlot", height="200")
         )
     )
 )
