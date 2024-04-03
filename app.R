@@ -1,4 +1,4 @@
-pacman::p_load(shiny, tidyverse, tmap, sf, smoothr, SpatialAcc, hash, cowplot, maptools, spatstat, raster, tidyr)
+pacman::p_load(shiny, maptools, spatstat, raster, tidyverse, tmap, sf, smoothr, SpatialAcc, hash, cowplot)
 
 name2file <- new.env(hash=T, parent=emptyenv())
 
@@ -49,77 +49,6 @@ scales <- c("fixed", "sd", "equal", "pretty", "quantile", "kmeans", "hclust", "b
 evenly_separated <- function(A, B) {
   seq <- seq(0, A, length.out = B)
   return(seq)
-}
-
-plot_acc <- function(method, quantiles, grid_size, point_type, exponent, subz, useHex, colorPal, scale) {
-  if(useHex) {
-    grid <- read_rds(paste('data/rds/grid_', grid_size, '_hexagon', ifelse(subz, '_sz', '_pa'),'.rds', sep=""))
-  }
-  else {
-    grid <- read_rds(paste('data/rds/grid_', grid_size, '_square', ifelse(subz, '_sz', '_pa'),'.rds', sep=""))
-  }
-  
-  points <- read_rds(paste('data/rds/', name2file[[point_type]], sep="")) %>%
-    mutate(capacity = 500)
-  
-  centroid.coords <- st_coordinates(st_centroid(grid))
-  points.coords <- st_coordinates(points)
-  
-  dm <- exp(distance(centroid.coords, points.coords, type = "euclidean") / 1000 * exponent)
-  
-  acc <- data.frame(ac(grid$demand,
-                       points$capacity,
-                       dm, 
-                       d0 = 250,
-                       power = 2, 
-                       family = method))
-  
-  colnames(acc) <- "acc"
-  hexagon <- bind_cols(grid, as_tibble(acc))
-  hexagon$acc[is.infinite(hexagon$acc)] <- NA
-  
-  mapex <- st_bbox(grid)
-  
-  tm <- tm_shape(grid) + 
-    tm_polygons() +
-    tm_shape(hexagon,
-             bbox = mapex) + 
-    tm_fill(col = "acc",
-            n = quantiles,
-            style = scale,
-            breaks = evenly_separated(max(hexagon$acc), quantiles),
-            border.col = "black",
-            border.lwd = 1,
-            na.rm = TRUE,
-            palette=colorPal) +
-    tm_shape(points) +
-    tm_symbols(size = 0.1) +
-    tm_layout(main.title = paste("Accessibility to ", point_type, ": ", method," method", sep=""),
-              main.title.position = "center",
-              main.title.size = 1,
-              legend.outside = FALSE,
-              legend.height = 0.5, 
-              legend.width = 0.5,
-              legend.format = list(digits = 3),
-              legend.position = c("right", "top"),
-              frame = FALSE) +
-    tm_compass(type="8star", size = 2) +
-    tm_scale_bar(width = 0.20) +
-    tm_grid(lwd = 0.1, alpha = 0.5)
-  
-  hexagon_acc <- st_join(hexagon, read_rds('data/rds/mpsz.rds') , join = st_intersects)
-  
-  region_bxp <- ggplot(data=hexagon_acc, 
-                       aes(y = acc, 
-                           x = REGION_N)) +
-    geom_boxplot(outliers = FALSE) +
-    labs(x = "REGION", y = "ACCESSIBILITY") + 
-    geom_point(stat="summary", 
-               fun.y="mean", 
-               colour ="red", 
-               size=2)
-  
-  plot_grid(tmap_grob(tm), region_bxp, nrow = 2, rel_heights = c(2, 1))
 }
 
 plot_kde <- function(bandwidth, bandwidthNum, kernel, point_type) {
@@ -260,29 +189,121 @@ ui <- fluidPage(
                       selected="viridis"),
           selectInput("scale", label="Scaling:",
                       choices = scales,
-                      selected="quantile")
+                      selected="quantile"),
+          actionButton("generate_button", "Generate Plots"),
         ),
 
         # Show a plot of the generated distribution
         mainPanel(
-           plotOutput("accPlot")
+          plotOutput("accPlot"),
+          plotOutput("accBarPlot")
         )
     )
 )
 
-# Define server logic required to draw a histogram
 server <- function(input, output) {
-    output$accPlot <- renderPlot({
-      plot_acc(input$family, 
-               input$quantiles, 
-               input$gridSize, 
-               input$poiType, 
-               input$exponent, 
-               input$granularity == "Subzone", 
-               input$gridShape == "Hexagon",
-               input$colorPal,
-               input$scale)
-    })
+  trigger <- reactiveVal(FALSE)
+  
+  plot_acc <- function(method, quantiles, grid_size, point_type, exponent, subz, useHex, colorPal, scale) {
+    req(trigger())
+    
+    if(useHex) {
+      grid <- read_rds(paste('data/rds/grid_', grid_size, '_hexagon', ifelse(subz, '_sz', '_pa'),'.rds', sep=""))
+    }
+    else {
+      grid <- read_rds(paste('data/rds/grid_', grid_size, '_square', ifelse(subz, '_sz', '_pa'),'.rds', sep=""))
+    }
+    
+    points <- read_rds(paste('data/rds/', name2file[[point_type]], sep="")) %>%
+      mutate(capacity = 500)
+    
+    centroid.coords <- st_coordinates(st_centroid(grid))
+    points.coords <- st_coordinates(points)
+    
+    dm <- exp(distance(centroid.coords, points.coords, type = "euclidean") / 1000 * exponent)
+    
+    acc <- data.frame(ac(grid$demand,
+                         points$capacity,
+                         dm, 
+                         d0 = 250,
+                         power = 2, 
+                         family = method))
+    
+    colnames(acc) <- "acc"
+    hexagon <- bind_cols(grid, as_tibble(acc))
+    hexagon$acc[is.infinite(hexagon$acc)] <- NA
+    
+    mapex <- st_bbox(grid)
+    
+    tm <- tm_shape(grid) + 
+      tm_polygons() +
+      tm_shape(hexagon,
+               bbox = mapex) + 
+      tm_fill(col = "acc",
+              n = quantiles,
+              style = scale,
+              breaks = evenly_separated(max(hexagon$acc), quantiles),
+              border.col = "black",
+              border.lwd = 1,
+              na.rm = TRUE,
+              palette=colorPal) +
+      tm_shape(points) +
+      tm_symbols(size = 0.1) +
+      tm_layout(main.title = paste("Accessibility to ", point_type, ": ", method," method", sep=""),
+                main.title.position = "center",
+                main.title.size = 1,
+                legend.outside = FALSE,
+                legend.height = 0.5, 
+                legend.width = 0.5,
+                legend.format = list(digits = 3),
+                legend.position = c("right", "top"),
+                frame = FALSE) +
+      tm_compass(type="8star", size = 2) +
+      tm_scale_bar(width = 0.20) +
+      tm_grid(lwd = 0.1, alpha = 0.5)
+    
+    hexagon_acc <- st_join(hexagon, read_rds('data/rds/mpsz.rds') , join = st_intersects)
+    
+    region_bxp <- ggplot(data=hexagon_acc, 
+                         aes(y = acc, 
+                             x = REGION_N)) +
+      geom_boxplot(outliers = FALSE) +
+      labs(x = "REGION", y = "ACCESSIBILITY") + 
+      geom_point(stat="summary", 
+                 fun.y="mean", 
+                 colour ="red", 
+                 size=2)
+    
+    return(list(accP=tm, accBP=region_bxp))
+  }
+  
+  
+  output$accPlot <- renderPlot({
+    plot_acc(input$family, 
+             input$quantiles, 
+             input$gridSize, 
+             input$poiType, 
+             input$exponent, 
+             input$granularity == "Subzone", 
+             input$gridShape == "Hexagon",
+             input$colorPal,
+             input$scale)$accP
+  })
+  
+  output$accBarPlot <- renderPlot({
+    plot_acc(input$family, 
+             input$quantiles, 
+             input$gridSize, 
+             input$poiType, 
+             input$exponent, 
+             input$granularity == "Subzone", 
+             input$gridShape == "Hexagon",
+             input$colorPal,
+             input$scale)$accBP
+  })
+  observeEvent(input$generate_button, {
+    trigger(TRUE)
+  })
 }
 
 # Run the application 
