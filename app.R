@@ -1,5 +1,11 @@
 pacman::p_load(shiny, spatstat, raster, tidyverse, tmap, sf, smoothr, SpatialAcc, hash, cowplot)
 
+pkgFile <- "maptools_1.1-8.tar.gz"
+
+install.packages(pkgs=pkgFile, type="source", repos=NULL)
+
+library(maptools)
+
 name2file <- new.env(hash=T, parent=emptyenv())
 
 name2file[["Markets or Food Centres"]] <- "markets_and_food_centres.rds"
@@ -42,6 +48,9 @@ location_options <- c(c("Markets or Food Centres", "Hawker Centres", "Markets an
                                                                             "Libraries", "Lodging", "Places of Worship", "Restaurants",
                                                                           "Schools", "Tourist Attractions", "Bus Stops")))
 
+mpsz_sp <- readRDS("data/rds/mpsz_sp.rds")
+subzone_names <- sort(unique(mpsz_sp$SUBZONE_N))
+
 tmap_color_palettes <- c("inferno", "magma", "plasma", "viridis", "YlGn", "YlGnBu", "GnBu", "BuGn", "PuBuGn", "PuBu", "BuPu", "RdPu", "PuRd", "YlOrRd")
                       
 scales <- c("fixed", "sd", "equal", "pretty", "quantile", "kmeans", "hclust", "bclust", "fisher", "jenks", "dpih", "headtails", "log10_pretty")
@@ -51,159 +60,222 @@ evenly_separated <- function(A, B) {
   return(seq)
 }
 
-plot_kde <- function(bandwidth, bandwidthNum, kernel, point_type) {
-  merged <- read_rds("data/rds/merged.rds")
-  place <- read_rds(paste('data/rds/', name2file[[point_type]], sep="")) %>%
-    mutate(capacity = 500)
-  place_sp <- as_Spatial(place)
-  place_sp <- as(place_sp, "SpatialPoints")
-  place_ppp <- as(place_sp, "ppp")
-  place_ppp_jit <- rjitter(place_ppp,
-                           retry=TRUE,
-                           nsim=1,
-                           drop=TRUE)
-  merged_owin <- read_rds("data/rds/merged_owin.rds")
-  placeSG_ppp = place_ppp[merged_owin]
-  placeSG_ppp.km <- rescale(placeSG_ppp, 1000, "km")
-  if (bandwidth == "fixed") {
-    KDE <- density(placeSG_ppp.km, 
-                   sigma=bandwidthNum, 
-                   edge=TRUE, 
-                   kernel=kernel)
-  } else if (bandwidth == "adaptive") {
-    KDE <- adaptive.density(placeSG_ppp.km, 
-                            method="kernel")
-  } else if (bandwidth == "diggle") {
-    KDE <- density(placeSG_ppp.km, 
-                   sigma=bw.diggle, 
-                   edge=TRUE, 
-                   kernel=kernel)
-  } else if (bandwidth == "cvl") {
-    KDE <- density(placeSG_ppp.km, 
-                   sigma=bw.CvL, 
-                   edge=TRUE, 
-                   kernel=kernel)
-  } else if (bandwidth == "scott") {
-    KDE <- density(placeSG_ppp.km, 
-                   sigma=bw.scott, 
-                   edge=TRUE, 
-                   kernel=kernel)
-  } else {
-    KDE <- density(placeSG_ppp.km, 
-                   sigma=bw.ppl, 
-                   edge=TRUE, 
-                   kernel=kernel)
-  }
-  gridded <- as.SpatialGridDataFrame.im(KDE)
-  KDEraster <- raster(gridded)
-  projection(KDEraster) <- CRS("+init=EPSG:3414 +units=km")
-  tmap_mode("view")
-  tm_basemap(server="OpenStreetMap.HOT") +
-    tm_basemap(server = "Esri.WorldImagery") +
-    tm_shape(KDEraster) +
-    tm_raster("v",
-              title = "Kernel Density",
-              style = "pretty",
-              alpha = 0.6,
-              palette = c("#fafac3","#fd953b","#f02a75","#b62385","#021c9e")) +
-    tm_shape(merged)+
-    tm_polygons(alpha=0.1,
-                id="PLN_AREA_N", 
-                popup.vars=c(
-                  "Subzone",
-                  "Region",
-                  "Total Population",
-                  "9 and under",
-                  "10-19",
-                  "20-29",
-                  "30-39",
-                  "40-49",
-                  "50-59",
-                  "60-69",
-                  "70 and above"
-                ))+
-    tmap_options(check.and.fix = TRUE)
-}
-
-plot_sppa <- function(subzone, whichFunction, point_type, nsim) {
-  mpsz_sp <- read_rds("data/rds/mpsz_sp.rds")
-  sz = mpsz_sp[mpsz_sp@data$SUBZONE_N == toupper(subzone),]
-  sz_sp = as(sz, "SpatialPolygons")
-  sz_owin = as(sz_sp, "owin")
-  place <- read_rds(paste('data/rds/', name2file[[point_type]], sep="")) %>%
-    mutate(capacity = 500)
-  place_sp <- as_Spatial(place)
-  place_sp <- as(place_sp, "SpatialPoints")
-  place_ppp <- as(place_sp, "ppp")
-  place_ppp_jit <- rjitter(place_ppp,
-                           retry=TRUE,
-                           nsim=1,
-                           drop=TRUE)
-  sz_ppp = place_ppp_jit[sz_owin]
-  
-  if (tolower(whichFunction) == "g") {
-    plot(envelope(sz_ppp, Gest, correction="all", nsim=nsim))
-  } else if (tolower(whichFunction) == "f") {
-    plot(envelope(sz_ppp, Fest, correction="all", nsim=nsim))
-  } else if (tolower(whichFunction) == "k") {
-    K.csr <- envelope(sz_ppp, Kest, nsim=nsim, rank=1, glocal=TRUE)
-    plot(K.csr, . - r ~ r, 
-         xlab="d", ylab="K(d)-r", xlim=c(0,500))
-  } else {
-    L.csr <- envelope(sz_ppp, Lest, nsim=nsim, rank=1, glocal=TRUE)
-    plot(L.csr, . - r ~ r, 
-         xlab="d", ylab="L(d)-r", xlim=c(0,500))
-  }
-}
-
 # Define UI for application that draws a histogram
 ui <- fluidPage(
 
     # Application title
     titlePanel("Accessibility Modelling in Singapore"),
-
-    # Sidebar with a slider input for number of bins 
-    sidebarLayout(
-        sidebarPanel(
-          selectInput("family", label = "Accessibility Modelling Family:",
-                      choices = c("Hansen", "KD2SFCA", "SAM"),
-                      selected = "250"),
-          sliderInput("quantiles", label = "Breaks:",
-                      min = 4, max = 10, value = 6),
-          selectInput("gridSize", label = "Grid Size:",
-                      choices = c("250", "500", "1000"),
-                      selected = "250"),
-          selectInput("poiType", label = "Place of Interest:",
-                      choices = location_options,
-                      selected = "Markets"),
-          sliderInput("exponent", label = "Distance Exponent:",
-                      min = 1, max = 3, value = 2, step = 0.25),
-          radioButtons("granularity", label = "Subzone or Planning Area Population:",
-                       choices = c("Subzone", "Planning Area"),
-                       selected = "Subzone"),
-          radioButtons("gridShape", label = "Grid Shape:",
-                       choices = c("Hexagon", "Square"),
-                       selected = "Hexagon"),
-          selectInput("colorPal", label="Colour Palette",
-                      choices=tmap_color_palettes,
-                      selected="viridis"),
-          selectInput("scale", label="Scaling:",
-                      choices = scales,
-                      selected="quantile"),
-          numericInput("cap_m", "Capacity Multiplier:", value = 1, min = 1, max = 100),
-          actionButton("generate_button", "Generate Plots"),
-        ),
-
-        # Show a plot of the generated distribution
-        mainPanel(
-          plotOutput("accPlot", height="700"),
-          plotOutput("accBarPlot", height="200")
-        )
+    tabsetPanel(
+      tabPanel("Accessibility",
+         # Sidebar with a slider input for number of bins 
+         sidebarLayout(
+           sidebarPanel(
+             selectInput("family", label = "Accessibility Modelling Family:",
+                         choices = c("Hansen", "KD2SFCA", "SAM"),
+                         selected = "250"),
+             sliderInput("quantiles", label = "Breaks:",
+                         min = 4, max = 10, value = 6),
+             selectInput("gridSize", label = "Grid Size:",
+                         choices = c("250", "500", "1000"),
+                         selected = "250"),
+             selectInput("poiType", label = "Place of Interest:",
+                         choices = location_options,
+                         selected = "Markets"),
+             sliderInput("exponent", label = "Distance Exponent:",
+                         min = 1, max = 3, value = 2, step = 0.25),
+             radioButtons("granularity", label = "Subzone or Planning Area Population:",
+                          choices = c("Subzone", "Planning Area"),
+                          selected = "Subzone"),
+             radioButtons("gridShape", label = "Grid Shape:",
+                          choices = c("Hexagon", "Square"),
+                          selected = "Hexagon"),
+             selectInput("colorPal", label="Colour Palette",
+                         choices=tmap_color_palettes,
+                         selected="viridis"),
+             selectInput("scale", label="Scaling:",
+                         choices = scales,
+                         selected="quantile"),
+             numericInput("cap_m", "Capacity Multiplier:", value = 1, min = 1, max = 100),
+             actionButton("generate_button", "Generate Plots")
+           ),
+           
+           # Show a plot of the generated distribution
+           mainPanel(
+             plotOutput("accPlot", height="700"),
+             plotOutput("accBarPlot", height="200")
+           )
+         )
+      ),
+      
+      tabPanel("KDE",
+         sidebarLayout(
+           sidebarPanel(
+             selectInput("bandwidthType", "Bandwidth:",
+                         choices = c(Fixed = "fixed", Adaptive = "adaptive", Auto = "automatic"),
+                         selected="fixed"),
+             conditionalPanel(
+               condition = "input.bandwidthType == 'fixed'",
+               sliderInput("bandwidthVal", "Fixed Bandwidth Value:",
+                             value=1, min=0, max=5, step=0.1)
+             ),
+             conditionalPanel(
+               condition = "input.bandwidthType == 'automatic'",
+               selectInput("autoBandwidthType", "Automatic Bandwidth Method:",
+                           choices = c(bw.diggle = "diggle", bw.CvL = "cvl", bw.scott = "scott", bw.ppl ="ppl"),
+                           selected = "diggle")
+             ),
+             selectInput("kernel", "Smoothing Kernel:",
+                         choices = c(Gaussian = "gaussian", Epanechnikov = "epanechnikov", Quartic = "quartic", Disc = "disc"),
+                         selected = "gaussian"),
+             actionButton("generate_kde_button", "Generate KDE")
+           ),
+           
+           # Show a plot of the generated KDE
+           mainPanel(
+             plotOutput("kdePlot")
+           )
+         )
+      ),
+      
+      tabPanel("2SPPA",
+         sidebarLayout(
+           sidebarPanel(
+             selectInput("subzone", "Subzone:",
+                         choices = subzone_names
+             ),
+             selectInput("whichFunction", "Function:",
+                         choices = c(GFunction = "g", FFunction = "f", KFunction = "k", LFunction = "l")
+             ),
+             numericInput("nsim", "No. of Simulations:",
+                          value=50, min=1, max=99, step=1
+             ),
+             selectInput("poiType", label = "Place of Interest:",
+                         choices = location_options,
+                         selected = "Markets"
+             ),
+             actionButton("generate_sppa_button", "Generate Analysis")
+           ),
+           
+           # Show a plot of the generated KDE
+           mainPanel(
+             plotOutput("sppaPlot")
+           )
+         )
+      )
     )
 )
 
 server <- function(input, output) {
   trigger <- reactiveVal(FALSE)
+  triggerKDE <- reactiveVal(FALSE)
+  triggerSPPA <- reactiveVal(FALSE)
+  
+  plot_kde <- function(bandwidth, bandwidthNum, auto, kernel, point_type) {
+    req(triggerKDE())
+    merged <- read_rds("data/rds/merged.rds")
+    place <- read_rds(paste('data/rds/', name2file[[point_type]], sep="")) %>%
+      mutate(capacity = 500)
+    place_sp <- as_Spatial(place)
+    place_sp <- as(place_sp, "SpatialPoints")
+    place_ppp <- as(place_sp, "ppp")
+    place_ppp_jit <- rjitter(place_ppp,
+                             retry=TRUE,
+                             nsim=1,
+                             drop=TRUE)
+    merged_owin <- read_rds("data/rds/merged_owin.rds")
+    placeSG_ppp = place_ppp[merged_owin]
+    placeSG_ppp.km <- rescale(placeSG_ppp, 1000, "km")
+    
+    if (bandwidth == "fixed") {
+      KDE <- density(placeSG_ppp.km, 
+                     sigma=bandwidthNum, 
+                     edge=TRUE, 
+                     kernel=kernel)
+    } else if (bandwidth == "adaptive") {
+      KDE <- adaptive.density(placeSG_ppp.km, 
+                              method="kernel")
+    } else if (auto == "diggle") {
+      KDE <- density(placeSG_ppp.km, 
+                     sigma=bw.diggle, 
+                     edge=TRUE, 
+                     kernel=kernel)
+    } else if (auto == "cvl") {
+      KDE <- density(placeSG_ppp.km, 
+                     sigma=bw.CvL, 
+                     edge=TRUE, 
+                     kernel=kernel)
+    } else if (auto == "scott") {
+      KDE <- density(placeSG_ppp.km, 
+                     sigma=bw.scott, 
+                     edge=TRUE, 
+                     kernel=kernel)
+    } else {
+      KDE <- density(placeSG_ppp.km, 
+                     sigma=bw.ppl, 
+                     edge=TRUE, 
+                     kernel=kernel)
+    }
+    gridded <- as.SpatialGridDataFrame.im(KDE)
+    KDEraster <- raster(gridded)
+    projection(KDEraster) <- CRS("+init=EPSG:3414 +units=km")
+    tmap_mode("view")
+    tm_basemap(server="OpenStreetMap.HOT") +
+      tm_basemap(server = "Esri.WorldImagery") +
+      tm_shape(KDEraster) +
+      tm_raster("v",
+                title = "Kernel Density",
+                style = "pretty",
+                alpha = 0.6,
+                palette = c("#fafac3","#fd953b","#f02a75","#b62385","#021c9e")) +
+      tm_shape(merged)+
+      tm_polygons(alpha=0.1,
+                  id="PLN_AREA_N", 
+                  popup.vars=c(
+                    "Subzone",
+                    "Region",
+                    "Total Population",
+                    "9 and under",
+                    "10-19",
+                    "20-29",
+                    "30-39",
+                    "40-49",
+                    "50-59",
+                    "60-69",
+                    "70 and above"
+                  ))+
+      tmap_options(check.and.fix = TRUE)
+  }
+  
+  plot_sppa <- function(subzone, whichFunction, point_type, nsim) {
+    mpsz_sp <- read_rds("data/rds/mpsz_sp.rds")
+    sz = mpsz_sp[mpsz_sp@data$SUBZONE_N == toupper(subzone),]
+    sz_sp = as(sz, "SpatialPolygons")
+    sz_owin = as(sz_sp, "owin")
+    place <- read_rds(paste('data/rds/', name2file[[point_type]], sep="")) %>%
+      mutate(capacity = 500)
+    place_sp <- as_Spatial(place)
+    place_sp <- as(place_sp, "SpatialPoints")
+    place_ppp <- as.ppp(place_sp)
+    place_ppp_jit <- rjitter(place_ppp,
+                             retry=TRUE,
+                             nsim=1,
+                             drop=TRUE)
+    sz_ppp = place_ppp_jit[sz_owin]
+    
+    if (tolower(whichFunction) == "g") {
+      plot(envelope(sz_ppp, Gest, correction="all", nsim=nsim))
+    } else if (tolower(whichFunction) == "f") {
+      plot(envelope(sz_ppp, Fest, correction="all", nsim=nsim))
+    } else if (tolower(whichFunction) == "k") {
+      K.csr <- envelope(sz_ppp, Kest, nsim=nsim, rank=1, glocal=TRUE)
+      plot(K.csr, . - r ~ r, 
+           xlab="d", ylab="K(d)-r", xlim=c(0,500))
+    } else {
+      L.csr <- envelope(sz_ppp, Lest, nsim=nsim, rank=1, glocal=TRUE)
+      plot(L.csr, . - r ~ r, 
+           xlab="d", ylab="L(d)-r", xlim=c(0,500))
+    }
+  }
   
   plot_acc <- function(method, quantiles, grid_size, point_type, exponent, subz, useHex, colorPal, scale, cap_mult) {
     req(trigger())
@@ -305,9 +377,31 @@ server <- function(input, output) {
              input$scale,
              input$cap_m)$accBP
   })
+  
+  output$kdePlot <- renderPlot({
+    plot_kde(input$bandwidthType, 
+             input$bandwidthVal, 
+             input$autoBandwidthType, 
+             input$kernel, 
+             input$poiType)
+  })
+  
+  output$sppaPlot <- renderPlot({
+    plot_sppa(input$subzone,
+              input$whichFunction,
+              input$poiType,
+              input$nsim)
+  })
+  
   observeEvent(input$generate_button, {
     trigger(TRUE)
   })
+  observeEvent(input$generate_kde_button, {
+    triggerKDE(TRUE)
+  }) 
+  observeEvent(input$generate_spp_button, {
+    triggerSPPA(TRUE)
+  }) 
 }
 
 # Run the application 
