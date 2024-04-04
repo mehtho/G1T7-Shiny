@@ -132,7 +132,7 @@ ui <- fluidPage(
            
            # Show a plot of the generated KDE
            mainPanel(
-             plotOutput("kdePlot")
+             tmapOutput("kdePlot")
            )
          )
       ),
@@ -385,7 +385,7 @@ server <- function(input, output) {
              input$cap_m)$accBP
   })
   
-  output$kdePlot <- renderPlot({
+  output$kdePlot <- renderTmap({
     plot_kde(input$bandwidthType, 
              input$bandwidthVal, 
              input$autoBandwidthType, 
