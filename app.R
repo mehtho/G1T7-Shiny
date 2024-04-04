@@ -102,7 +102,8 @@ ui <- fluidPage(
            # Show a plot of the generated distribution
            mainPanel(
              plotOutput("accPlot", height="700"),
-             plotOutput("accBarPlot", height="200")
+             plotOutput("accBarPlot", height="100"),
+             plotOutput("accHist", height="100")
            )
          )
       ),
@@ -355,7 +356,16 @@ server <- function(input, output) {
                  colour ="red", 
                  size=2)
     
-    return(list(accP=tm, accBP=region_bxp))
+    hexagon$acc_log2 <- log2(hexagon$acc)
+    
+    filtered <- hexagon$acc_log2[hexagon$acc_log2 >= 1e-100]
+    
+    accH <- ggplot(data.frame(filtered), aes(x = filtered)) +
+      geom_histogram(binwidth = 1, fill = "skyblue", color = "black", alpha = 0.7) +
+      labs(title = "Log2 Accessibility Histogram", x = "Log2 Accessibility", y = "Frequency") +
+      theme_minimal()
+    
+    return(list(accP=tm, accBP=region_bxp, accHist=accH))
   }
   
   
@@ -383,6 +393,19 @@ server <- function(input, output) {
              input$colorPal,
              input$scale,
              input$cap_m)$accBP
+  })
+  
+  output$accHist <- renderPlot({
+    plot_acc(input$family, 
+             input$quantiles, 
+             input$gridSize, 
+             input$poiType, 
+             input$exponent, 
+             input$granularity == "Subzone", 
+             input$gridShape == "Hexagon",
+             input$colorPal,
+             input$scale,
+             input$cap_m)$accHist
   })
   
   output$kdePlot <- renderTmap({
