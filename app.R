@@ -406,7 +406,7 @@ server <- function(input, output) {
   observeEvent(input$generate_kde_button, {
     triggerKDE(TRUE)
   }) 
-  observeEvent(input$generate_spp_button, {
+  observeEvent(input$generate_sppa_button, {
     triggerSPPA(TRUE)
   }) 
 }
