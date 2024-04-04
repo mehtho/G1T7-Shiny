@@ -12,7 +12,7 @@ name2file[["Markets or Food Centres"]] <- "markets_and_food_centres.rds"
 
 name2file[["Markets"]] <- "markets_and_food_centres_MARKET.rds"
 name2file[["Hawker Centres"]] <- "markets_and_food_centres_HAWKER_CENTRE.rds"
-name2file[["Markets and Food Centres"]] <- "markets_and_food_centres_MARKET_AND_HAKWER.rds"
+name2file[["Markets and Food Centres"]] <- "markets_and_food_centres_MARKET_AND_HAWKER.rds"
 
 name2file[["Supermarkets"]] <- "supermarkets.rds"
 
@@ -309,6 +309,13 @@ server <- function(input, output) {
     
     mapex <- st_bbox(grid)
     
+    if(is.na(max(hexagon$acc))) {
+      bks <- evenly_separated(100, quantiles)
+    }
+    else{
+      bks <- evenly_separated(max(hexagon$acc), quantiles)
+    }
+    
     tm <- tm_shape(grid) + 
       tm_polygons() +
       tm_shape(hexagon,
@@ -316,7 +323,7 @@ server <- function(input, output) {
       tm_fill(col = "acc",
               n = quantiles,
               style = scale,
-              breaks = evenly_separated(max(hexagon$acc), quantiles),
+              breaks = bks,
               border.col = "black",
               border.lwd = 1,
               na.rm = TRUE,
