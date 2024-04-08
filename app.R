@@ -67,48 +67,51 @@ ui <- fluidPage(
     navbarPage(
       "WhatTown",
       tabPanel("Accessibility",
-               # Sidebar with a slider input for number of bins 
-               sidebarLayout(
-                 sidebarPanel(
-                   selectInput("family", label = "Accessibility Modelling Family:",
-                               choices = c("Hansen", "KD2SFCA", "SAM"),
-                               selected = "250"),
-                   sliderInput("quantiles", label = "Breaks:",
-                               min = 4, max = 10, value = 6),
-                   selectInput("gridSize", label = "Grid Size:",
-                               choices = c("250", "500", "1000"),
-                               selected = "250"),
-                   selectInput("poiType", label = "Place of Interest:",
-                               choices = location_options,
-                               selected = "Markets"),
-                   sliderInput("exponent", label = "Distance Exponent:",
-                               min = 1, max = 3, value = 2, step = 0.25),
-                   radioButtons("granularity", label = "Subzone or Planning Area Population:",
-                                choices = c("Subzone", "Planning Area"),
-                                selected = "Subzone"),
-                   radioButtons("gridShape", label = "Grid Shape:",
-                                choices = c("Hexagon", "Square"),
-                                selected = "Hexagon"),
-                   selectInput("colorPal", label="Colour Palette",
-                               choices=tmap_color_palettes,
-                               selected="viridis"),
-                   selectInput("scale", label="Scaling:",
-                               choices = scales,
-                               selected="quantile"),
-                   numericInput("cap_m", "Capacity Multiplier:", value = 1, min = 1, max = 100),
-                   actionButton("generate_button", "Generate Plots")
-                 ),
-                 
-                 # Show a plot of the generated distribution
-                 mainPanel(
-                   shinycssloaders::withSpinner(
-                     plotOutput("accPlot", height="700")
-                   ),
-                   shinycssloaders::withSpinner(
-                     plotOutput("accBarPlot", height="200")
-                   )
-                 )
-               )
+         # Sidebar with a slider input for number of bins 
+         sidebarLayout(
+           sidebarPanel(
+             selectInput("family", label = "Accessibility Modelling Family:",
+                         choices = c("Hansen", "KD2SFCA", "SAM"),
+                         selected = "250"),
+             sliderInput("quantiles", label = "Breaks:",
+                         min = 4, max = 10, value = 6),
+             selectInput("gridSize", label = "Grid Size:",
+                         choices = c("250", "500", "1000"),
+                         selected = "250"),
+             selectInput("poiType", label = "Place of Interest:",
+                         choices = location_options,
+                         selected = "Markets"),
+             sliderInput("exponent", label = "Distance Exponent:",
+                         min = 1, max = 3, value = 2, step = 0.25),
+             radioButtons("granularity", label = "Subzone or Planning Area Population:",
+                          choices = c("Subzone", "Planning Area"),
+                          selected = "Subzone"),
+             radioButtons("gridShape", label = "Grid Shape:",
+                          choices = c("Hexagon", "Square"),
+                          selected = "Hexagon"),
+             selectInput("colorPal", label="Colour Palette",
+                         choices=tmap_color_palettes,
+                         selected="viridis"),
+             selectInput("scale", label="Scaling:",
+                         choices = scales,
+                         selected="quantile"),
+             numericInput("cap_m", "Capacity Multiplier:", value = 1, min = 1, max = 100),
+             actionButton("generate_button", "Generate Plots")
+           ),
+           
+           # Show a plot of the generated distribution
+           mainPanel(
+             shinycssloaders::withSpinner(
+              plotOutput("accPlot", height="700")
+             ),
+             shinycssloaders::withSpinner(
+               plotOutput("accBarPlot", height="100")
+             ),
+             shinycssloaders::withSpinner(
+               plotOutput("accHist", height="100")
+             )
+           )
+         )
       ),
       
       tabPanel("KDE",
@@ -377,7 +380,16 @@ server <- function(input, output) {
                  colour ="red", 
                  size=2)
     
-    return(list(accP=tm, accBP=region_bxp))
+    hexagon$acc_log2 <- log2(hexagon$acc)
+    
+    filtered <- hexagon$acc_log2[hexagon$acc_log2 >= 1e-100]
+    
+    accH <- ggplot(data.frame(filtered), aes(x = filtered)) +
+      geom_histogram(binwidth = 1, fill = "skyblue", color = "black", alpha = 0.7) +
+      labs(title = "Log2 Accessibility Histogram", x = "Log2 Accessibility", y = "Frequency") +
+      theme_minimal()
+    
+    return(list(accP=tm, accBP=region_bxp, accHist=accH))
   }
   
   
@@ -405,6 +417,19 @@ server <- function(input, output) {
              input$colorPal,
              input$scale,
              input$cap_m)$accBP
+  })
+  
+  output$accHist <- renderPlot({
+    plot_acc(input$family, 
+             input$quantiles, 
+             input$gridSize, 
+             input$poiType, 
+             input$exponent, 
+             input$granularity == "Subzone", 
+             input$gridShape == "Hexagon",
+             input$colorPal,
+             input$scale,
+             input$cap_m)$accHist
   })
   
   output$kdePlot <- renderTmap({
