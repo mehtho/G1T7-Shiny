@@ -119,7 +119,7 @@ ui <- fluidPage(
                  sidebarPanel(
                    selectInput("poiKDE", "Places of Interest:",
                                choices = location_options,
-                               selected = "Markets"),
+                               selected = "Supermarkets"),
                    selectInput("bandwidthType", "Bandwidth:",
                                choices = c(Fixed = "fixed", Adaptive = "adaptive", Auto = "automatic"),
                                selected="fixed"),
@@ -155,17 +155,18 @@ ui <- fluidPage(
          sidebarLayout(
            sidebarPanel(
              selectInput("subzone", "Subzone:",
-                         choices = subzone_names
+                         choices = subzone_names,
+                         selected="ALJUNIED"
              ),
              selectInput("whichFunction", "Function:",
-                         choices = c(GFunction = "g", FFunction = "f", KFunction = "k", LFunction = "l")
+                         choices = c("G-Function" = "g", "K-Function" = "k")
              ),
              numericInput("nsim", "No. of Simulations:",
                           value=50, min=1, max=99, step=1
              ),
              selectInput("poiSPPA", label = "Place of Interest:",
                          choices = location_options,
-                         selected = "Markets"
+                         selected = "Supermarkets"
              ),
              actionButton("generate_sppa_button", "Generate Analysis")
            ),
@@ -175,14 +176,24 @@ ui <- fluidPage(
              shinycssloaders::withSpinner(
                plotOutput("sppaPlot")
              ),
-             h4("What are the functions?"),
-             p("These functions are used to measure the spatial distribution of a set of points, frequently used in Spatial Points Pattern Analysis. They are used to determine if points are randomly distributed, clustered, or regularly spaced over a geographic area."),
-             h4("How to interpret the graphs?"),
-             p("First we have our hypothesis:"),
+             h3("What are these functions?"),
+             p("Our app uses statistical functions to analyze the spatial distribution of points like supermarkets and wet markets in Singapore neighborhoods. These functions help us understand how these points are spaced—are they close together, spread out, or randomly placed?"),
+             h4("G-Function"),
+             p("This function looks at the short-range interactions between points. Specifically, it measures the distance from one amenity to the nearest other point and helps us understand the tightness of their distribution."),
+             h4("K-Function"),
+             p("While the G-function focuses on the nearest neighbors, the K-function looks at the bigger picture. It helps us determine if points are clustered, randomly distributed, or evenly spread out over a larger scale."),
+             h3("How to interpret the graphs?"),
+             h4("First we have our hypotheses:"),
              p("H0: The distribution of points is randomly distributed."),
              p("H1: The distribution of points is not randomly distributed."),
-             p("If the value(black line) is above or below the envelope(grey background), we can reject H0 as the value is statistically significant. If it is above, the points of interests are clustered; if below, they are dispersed."),
-             p("If the value(black line) is within the envelope(grey background), we cannot reject H0 as the value is not statistically significant. It also indicates random distribution of the points of interests.")
+             h4("Interpretation:"),
+             p("The curve (Black line): This line represents the actual spatial pattern of points."),
+             p("The envelope (Grey zone): This is our 'zone of randomness' - it shows the range where we would expect the curve to fall if points were distributed by chance."),
+             p("If the curve lies above the envelope, it suggests clustering, and we can reject H0 as the value is statistically significant."),
+             p("If the curve falls below the envelope, it suggests dispersion, and we can reject H0 as the value is also statistically significant."),
+             p("If the curve lies within the envelope, it suggests the points might be spread out by chance, and there's no clear pattern. This means we don't have enough strong evidence to suggest anything other than random distribution."),
+             h4("What if there's no envelope/a straight curve?"),
+             p("Due to the small dataset, this is common and suggests that the data is either extremely uniform or there are too few data points. Without the envelope, we lose a benchmark for comparing the observed pattern against randomness. Consider trying out different parameters - however, we can still look at the shape of the curve to gain insights - an upward trend may indicate clustering, while a downward trend could indicate dispersion.")
            )
          )
       )
@@ -289,16 +300,8 @@ server <- function(input, output) {
     
     if (tolower(whichFunction) == "g") {
       plot(envelope(sz_ppp, Gest, correction="all", nsim=nsim))
-    } else if (tolower(whichFunction) == "f") {
-      plot(envelope(sz_ppp, Fest, correction="all", nsim=nsim))
     } else if (tolower(whichFunction) == "k") {
-      K.csr <- envelope(sz_ppp, Kest, nsim=nsim, rank=1, glocal=TRUE)
-      plot(K.csr, . - r ~ r, 
-           xlab="d", ylab="K(d)-r", xlim=c(0,500))
-    } else {
-      L.csr <- envelope(sz_ppp, Lest, nsim=nsim, rank=1, glocal=TRUE)
-      plot(L.csr, . - r ~ r, 
-           xlab="d", ylab="L(d)-r", xlim=c(0,500))
+      plot(envelope(sz_ppp, Kest, nsim=nsim, rank=1, glocal=TRUE))
     }
   }
   
