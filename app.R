@@ -1,4 +1,4 @@
-pacman::p_load(shiny, spatstat, raster, tidyverse, tmap, sf, smoothr, SpatialAcc, hash, cowplot)
+pacman::p_load(shiny, spatstat, raster, tidyverse, tmap, sf, smoothr, SpatialAcc, hash, cowplot, shinythemes, shinycssloaders)
 
 pkgFile <- "maptools_1.1-8.tar.gz"
 
@@ -62,79 +62,90 @@ evenly_separated <- function(A, B) {
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
-
+    theme = shinytheme("sandstone"),
     # Application title
-    titlePanel("Accessibility Modelling in Singapore"),
-    tabsetPanel(
+    navbarPage(
+      "WhatTown",
       tabPanel("Accessibility",
-         # Sidebar with a slider input for number of bins 
-         sidebarLayout(
-           sidebarPanel(
-             selectInput("family", label = "Accessibility Modelling Family:",
-                         choices = c("Hansen", "KD2SFCA", "SAM"),
-                         selected = "250"),
-             sliderInput("quantiles", label = "Breaks:",
-                         min = 4, max = 10, value = 6),
-             selectInput("gridSize", label = "Grid Size:",
-                         choices = c("250", "500", "1000"),
-                         selected = "250"),
-             selectInput("poiType", label = "Place of Interest:",
-                         choices = location_options,
-                         selected = "Markets"),
-             sliderInput("exponent", label = "Distance Exponent:",
-                         min = 1, max = 3, value = 2, step = 0.25),
-             radioButtons("granularity", label = "Subzone or Planning Area Population:",
-                          choices = c("Subzone", "Planning Area"),
-                          selected = "Subzone"),
-             radioButtons("gridShape", label = "Grid Shape:",
-                          choices = c("Hexagon", "Square"),
-                          selected = "Hexagon"),
-             selectInput("colorPal", label="Colour Palette",
-                         choices=tmap_color_palettes,
-                         selected="viridis"),
-             selectInput("scale", label="Scaling:",
-                         choices = scales,
-                         selected="quantile"),
-             numericInput("cap_m", "Capacity Multiplier:", value = 1, min = 1, max = 100),
-             actionButton("generate_button", "Generate Plots")
-           ),
-           
-           # Show a plot of the generated distribution
-           mainPanel(
-             plotOutput("accPlot", height="700"),
-             plotOutput("accBarPlot", height="200")
-           )
-         )
+               # Sidebar with a slider input for number of bins 
+               sidebarLayout(
+                 sidebarPanel(
+                   selectInput("family", label = "Accessibility Modelling Family:",
+                               choices = c("Hansen", "KD2SFCA", "SAM"),
+                               selected = "250"),
+                   sliderInput("quantiles", label = "Breaks:",
+                               min = 4, max = 10, value = 6),
+                   selectInput("gridSize", label = "Grid Size:",
+                               choices = c("250", "500", "1000"),
+                               selected = "250"),
+                   selectInput("poiType", label = "Place of Interest:",
+                               choices = location_options,
+                               selected = "Markets"),
+                   sliderInput("exponent", label = "Distance Exponent:",
+                               min = 1, max = 3, value = 2, step = 0.25),
+                   radioButtons("granularity", label = "Subzone or Planning Area Population:",
+                                choices = c("Subzone", "Planning Area"),
+                                selected = "Subzone"),
+                   radioButtons("gridShape", label = "Grid Shape:",
+                                choices = c("Hexagon", "Square"),
+                                selected = "Hexagon"),
+                   selectInput("colorPal", label="Colour Palette",
+                               choices=tmap_color_palettes,
+                               selected="viridis"),
+                   selectInput("scale", label="Scaling:",
+                               choices = scales,
+                               selected="quantile"),
+                   numericInput("cap_m", "Capacity Multiplier:", value = 1, min = 1, max = 100),
+                   actionButton("generate_button", "Generate Plots")
+                 ),
+                 
+                 # Show a plot of the generated distribution
+                 mainPanel(
+                   shinycssloaders::withSpinner(
+                     plotOutput("accPlot", height="700")
+                   ),
+                   shinycssloaders::withSpinner(
+                     plotOutput("accBarPlot", height="200")
+                   )
+                 )
+               )
       ),
       
       tabPanel("KDE",
-         sidebarLayout(
-           sidebarPanel(
-             selectInput("bandwidthType", "Bandwidth:",
-                         choices = c(Fixed = "fixed", Adaptive = "adaptive", Auto = "automatic"),
-                         selected="fixed"),
-             conditionalPanel(
-               condition = "input.bandwidthType == 'fixed'",
-               sliderInput("bandwidthVal", "Fixed Bandwidth Value:",
-                             value=1, min=0, max=5, step=0.1)
-             ),
-             conditionalPanel(
-               condition = "input.bandwidthType == 'automatic'",
-               selectInput("autoBandwidthType", "Automatic Bandwidth Method:",
-                           choices = c(bw.diggle = "diggle", bw.CvL = "cvl", bw.scott = "scott", bw.ppl ="ppl"),
-                           selected = "diggle")
-             ),
-             selectInput("kernel", "Smoothing Kernel:",
-                         choices = c(Gaussian = "gaussian", Epanechnikov = "epanechnikov", Quartic = "quartic", Disc = "disc"),
-                         selected = "gaussian"),
-             actionButton("generate_kde_button", "Generate KDE")
-           ),
-           
-           # Show a plot of the generated KDE
-           mainPanel(
-             tmapOutput("kdePlot")
-           )
-         )
+               sidebarLayout(
+                 sidebarPanel(
+                   selectInput("poiKDE", "Places of Interest:",
+                               choices = location_options,
+                               selected = "Markets"),
+                   selectInput("bandwidthType", "Bandwidth:",
+                               choices = c(Fixed = "fixed", Adaptive = "adaptive", Auto = "automatic"),
+                               selected="fixed"),
+                   conditionalPanel(
+                     condition = "input.bandwidthType == 'fixed'",
+                     sliderInput("bandwidthVal", "Fixed Bandwidth Value:",
+                                 value=1, min=0, max=5, step=0.1)
+                   ),
+                   conditionalPanel(
+                     condition = "input.bandwidthType == 'automatic'",
+                     selectInput("autoBandwidthType", "Automatic Bandwidth Method:",
+                                 choices = c(bw.diggle = "diggle", bw.CvL = "cvl", bw.scott = "scott", bw.ppl ="ppl"),
+                                 selected = "diggle")
+                   ),
+                   selectInput("kernel", "Smoothing Kernel:",
+                               choices = c(Gaussian = "gaussian", Epanechnikov = "epanechnikov", Quartic = "quartic", Disc = "disc"),
+                               selected = "gaussian"),
+                   actionButton("generate_kde_button", "Generate KDE")
+                 ),
+                 
+                 # Show a plot of the generated KDE
+                 mainPanel(
+                   shinycssloaders::withSpinner(
+                     tmapOutput("kdePlot")
+                   ),
+                   h4("What is KDE?"),
+                   p("KDE refers to Kernel Density Estimation, a method used to compute the intensity of a point distribution. With this map, you will be able to generate a visualization of the intensity of point distribution of a selected point of interest across Singapore.")
+                 )
+               )
       ),
       
       tabPanel("2SPPA",
@@ -149,16 +160,26 @@ ui <- fluidPage(
              numericInput("nsim", "No. of Simulations:",
                           value=50, min=1, max=99, step=1
              ),
-             selectInput("poiType", label = "Place of Interest:",
+             selectInput("poiSPPA", label = "Place of Interest:",
                          choices = location_options,
                          selected = "Markets"
              ),
              actionButton("generate_sppa_button", "Generate Analysis")
            ),
            
-           # Show a plot of the generated KDE
+           # Show a plot of the generated SPPA
            mainPanel(
-             plotOutput("sppaPlot")
+             shinycssloaders::withSpinner(
+               plotOutput("sppaPlot")
+             ),
+             h4("What are the functions?"),
+             p("These functions are used to measure the spatial distribution of a set of points, frequently used in Spatial Points Pattern Analysis. They are used to determine if points are randomly distributed, clustered, or regularly spaced over a geographic area."),
+             h4("How to interpret the graphs?"),
+             p("First we have our hypothesis:"),
+             p("H0: The distribution of points is randomly distributed."),
+             p("H1: The distribution of points is not randomly distributed."),
+             p("If the value(black line) is above or below the envelope(grey background), we can reject H0 as the value is statistically significant. If it is above, the points of interests are clustered; if below, they are dispersed."),
+             p("If the value(black line) is within the envelope(grey background), we cannot reject H0 as the value is not statistically significant. It also indicates random distribution of the points of interests.")
            )
          )
       )
@@ -247,6 +268,7 @@ server <- function(input, output) {
   }
   
   plot_sppa <- function(subzone, whichFunction, point_type, nsim) {
+    req(triggerSPPA())
     mpsz_sp <- read_rds("data/rds/mpsz_sp.rds")
     sz = mpsz_sp[mpsz_sp@data$SUBZONE_N == toupper(subzone),]
     sz_sp = as(sz, "SpatialPolygons")
@@ -390,13 +412,13 @@ server <- function(input, output) {
              input$bandwidthVal, 
              input$autoBandwidthType, 
              input$kernel, 
-             input$poiType)
+             input$poiKDE)
   })
   
   output$sppaPlot <- renderPlot({
     plot_sppa(input$subzone,
               input$whichFunction,
-              input$poiType,
+              input$poiSPPA,
               input$nsim)
   })
   
