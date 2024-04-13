@@ -92,7 +92,7 @@ ui <- fluidPage(
              selectInput("colorPal", label="Colour Palette",
                          choices=tmap_color_palettes,
                          selected="viridis"),
-             selectInput("scale", label="Scaling:",
+             selectInput("scale", label="Classification:",
                          choices = scales,
                          selected="quantile"),
              numericInput("cap_m", "Capacity Multiplier:", value = 1, min = 1, max = 100),
